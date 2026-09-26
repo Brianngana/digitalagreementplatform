@@ -38,7 +38,7 @@ export interface AgreementType {
   label: string;
   tag: string;
   questions: Question[];
-  build: (a: Record<string, string>) => { title: string; clauses: Clause[] };
+  build: (a: { [key: string]: any }) => { title: string; clauses: Clause[] };
 }
 
 const money = (v: string) => (v?.trim() ? `KSh ${v.trim()}` : "the agreed amount");
