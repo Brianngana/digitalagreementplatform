@@ -1,5 +1,6 @@
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import type { Agreement, AgreementStatus, Clause } from "@/lib/agreements";
 
 type AgreementRow = {
@@ -59,15 +60,15 @@ function rowToAgreement(row: AgreementRow): Agreement {
     type: row.type,
     title: row.title,
     partyA: row.party_a_name,
-    partyAEmail: row.party_a_email ?? undefined,
+    ...(row.party_a_email ? { partyAEmail: row.party_a_email } : {}),
     partyB: row.party_b_name,
-    partyBEmail: row.party_b_email ?? undefined,
+    ...(row.party_b_email ? { partyBEmail: row.party_b_email } : {}),
     answers: row.answers as Record<string, string>,
     clauses: row.clauses as Clause[],
     status: row.status === "cancelled" ? "draft" : row.status,
     revision: row.revision,
     contentHash: row.content_hash,
-    sealedAt: row.sealed_at ?? undefined,
+    ...(row.sealed_at ? { sealedAt: row.sealed_at } : {}),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -99,7 +100,7 @@ export async function createCloudAgreement(agreement: Omit<Agreement, "id" | "cr
     party_b_name: agreement.partyB,
     party_b_email: agreement.partyBEmail?.trim().toLowerCase() || null,
     answers: agreement.answers,
-    clauses: agreement.clauses,
+    clauses: agreement.clauses as unknown as Json,
     status: "draft",
     content_hash: contentHash,
   }).select("id").single();

@@ -46,7 +46,7 @@ export interface AgreementType {
   build: (a: Record<string, string>) => { title: string; clauses: Clause[] };
 }
 
-const money = (v: string) => (v?.trim() ? `KSh ${v.trim()}` : "the agreed amount");
+const money = (v: string | undefined) => (v?.trim() ? `KSh ${v.trim()}` : "the agreed amount");
 const or = (v: string | undefined, fallback: string) => (v?.trim() ? v.trim() : fallback);
 
 export const AGREEMENT_TYPES: AgreementType[] = [
