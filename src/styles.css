@@ -121,3 +121,7 @@
 @utility animate-rise {
   animation: rise 0.5s cubic-bezier(0.32, 0.72, 0, 1) both;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise, .animate-glass-drift { animation: none; }
+}

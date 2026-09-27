@@ -16,15 +16,34 @@ export function StudioBackdrop({ children }: { children: React.ReactNode }) {
   );
 }
 
+import { Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { LogOut, ShieldCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+
 export function AppHeader() {
+  const navigate = useNavigate();
+  const [email, setEmail] = useState<string | null>(null);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? null));
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => setEmail(session?.user.email ?? null));
+    return () => data.subscription.unsubscribe();
+  }, []);
+
+  async function signOut() {
+    await supabase.auth.signOut();
+    await navigate({ to: "/auth", replace: true });
+  }
   return (
     <header className="flex items-center justify-between pt-5">
-      <a href="/" className="flex items-center gap-2">
+      <Link to="/" className="flex min-w-0 items-center gap-2">
         <span className="grid size-8 place-items-center rounded-lg bg-seal font-display text-sm text-seal-foreground">
-          DA
+          DAP
         </span>
-        <span className="font-display text-xl tracking-wide uppercase">Digital Agreement</span>
-      </a>
+        <span className="truncate font-display text-base uppercase sm:text-xl">Digital Agreement Platform</span>
+      </Link>
+      {email ? <Button type="button" size="icon" variant="ghost" onClick={signOut} title="Sign out" aria-label="Sign out"><LogOut /></Button> : <Button asChild size="sm" variant="outline"><Link to="/auth"><ShieldCheck />Sign in</Link></Button>}
     </header>
   );
 }

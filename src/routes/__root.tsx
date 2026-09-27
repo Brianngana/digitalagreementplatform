@@ -77,13 +77,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Digital Agreement — Agreements Made Simple. Trust Made Strong." },
+      { title: "Digital Agreement Platform — Agreements Made Simple. Trust Made Strong." },
       {
         name: "description",
         content:
           "Create, understand, sign, and secure agreements in plain language — loans, rentals, sales, employment, partnerships and more.",
       },
-      { property: "og:title", content: "Digital Agreement" },
+      { property: "og:title", content: "Digital Agreement Platform" },
       {
         property: "og:description",
         content:

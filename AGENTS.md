@@ -8,3 +8,5 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+- Store profiles, agreements, signatures, and audit events in Lovable Cloud with account-scoped row policies; local browser storage is not a source of truth because agreements must remain private, shareable, and tamper-evident.
