@@ -34,7 +34,6 @@ function AuthPage() {
     setBusy(true); setMessage("");
     if (mode === "signup") {
       const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin, data: { display_name: name.trim() } } });
-      if (!error && data.user) await supabase.from("profiles").upsert({ id: data.user.id, display_name: name.trim() });
       setMessage(error?.message ?? "Check your email to confirm your account, then sign in.");
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
