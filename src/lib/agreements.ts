@@ -1,4 +1,4 @@
-// Digital Agreement — data model, templates, and local persistence.
+// Digital Agreement Platform — agreement templates and shared data model.
 
 export type AgreementStatus = "draft" | "awaiting" | "signed" | "completed";
 
@@ -19,15 +19,20 @@ export interface Clause {
 
 export interface Agreement {
   id: string;
+  ownerId?: string;
   type: string;
   title: string;
   partyA: string;
+  partyAEmail?: string;
   partyB: string;
+  partyBEmail?: string;
   answers: Record<string, string>;
   clauses: Clause[];
   status: AgreementStatus;
   createdAt: string;
   updatedAt: string;
+  revision?: number;
+  contentHash?: string;
   signatureA?: { name: string; at: string };
   signatureB?: { name: string; at: string };
   sealedAt?: string;
@@ -38,7 +43,7 @@ export interface AgreementType {
   label: string;
   tag: string;
   questions: Question[];
-  build: (a: { [key: string]: any }) => { title: string; clauses: Clause[] };
+  build: (a: Record<string, string>) => { title: string; clauses: Clause[] };
 }
 
 const money = (v: string) => (v?.trim() ? `KSh ${v.trim()}` : "the agreed amount");
