@@ -2,22 +2,24 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { StudioBackdrop, AppHeader } from "@/components/StudioBackdrop";
 import {
-  loadAgreements,
   STATUS_LABEL,
   type Agreement,
   type AgreementStatus,
 } from "@/lib/agreements";
+import { listCloudAgreements } from "@/lib/cloud-agreements";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Digital Agreement — Agreements Made Simple. Trust Made Strong." },
+      { title: "Digital Agreement Platform — Agreements Made Simple. Trust Made Strong." },
       {
         name: "description",
         content:
           "Create, understand, sign, and secure agreements in plain language — loans, rentals, sales, employment, partnerships and more.",
       },
-      { property: "og:title", content: "Digital Agreement" },
+      { property: "og:title", content: "Digital Agreement Platform" },
       {
         property: "og:description",
         content: "Create, understand, sign, and secure agreements in plain language.",
@@ -38,8 +40,16 @@ const chipClass: Record<AgreementStatus, string> = {
 
 function Index() {
   const [agreements, setAgreements] = useState<Agreement[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [signedIn, setSignedIn] = useState(false);
   useEffect(() => {
-    setAgreements(loadAgreements());
+    void supabase.auth.getUser().then(async ({ data }) => {
+      setSignedIn(Boolean(data.user));
+      if (data.user) {
+        try { setAgreements(await listCloudAgreements()); } catch { setAgreements([]); }
+      }
+      setLoading(false);
+    });
   }, []);
 
   const active = agreements.filter((a) => a.status !== "completed").length;
@@ -62,12 +72,7 @@ function Index() {
           parties sign — all from your phone.
         </p>
         <div className="mt-5 flex gap-3">
-          <Link
-            to="/create"
-            className="rounded-xl bg-seal px-5 py-3 text-sm font-semibold text-seal-foreground transition-transform active:scale-[0.98]"
-          >
-            Create agreement
-          </Link>
+          <Button asChild className="h-11 bg-seal text-seal-foreground"><Link to={signedIn ? "/create" : "/auth"}>{signedIn ? "Create agreement" : "Get started securely"}</Link></Button>
           <a
             href="#my-agreements"
             className="rounded-xl border border-foreground/15 bg-foreground/5 px-5 py-3 text-sm font-semibold text-foreground"
@@ -125,17 +130,12 @@ function Index() {
           <span className="text-[11px] font-medium text-muted-foreground">{agreements.length} total</span>
         </div>
 
-        {agreements.length === 0 ? (
+        {loading ? <div className="glass-panel mt-3 rounded-lg p-6 text-center text-sm text-muted-foreground">Loading your secure records…</div> : agreements.length === 0 ? (
           <div className="glass-panel mt-3 rounded-2xl p-6 text-center">
             <p className="text-sm text-muted-foreground">
               No agreements yet. Create your first one — it takes about two minutes.
             </p>
-            <Link
-              to="/create"
-              className="mt-4 inline-block rounded-xl bg-seal px-5 py-3 text-sm font-semibold text-seal-foreground"
-            >
-              Create agreement
-            </Link>
+            <Button asChild className="mt-4 bg-seal text-seal-foreground"><Link to={signedIn ? "/create" : "/auth"}>{signedIn ? "Create agreement" : "Sign in to begin"}</Link></Button>
           </div>
         ) : (
           <div className="mt-3 space-y-3">
@@ -153,6 +153,7 @@ function Index() {
                     <p className="mt-0.5 text-[12px] text-muted-foreground">
                       {a.partyA} · {a.partyB}
                     </p>
+                    <p className="mt-2 font-mono text-[10px] font-semibold tracking-wider text-cool">{a.agreementCode}</p>
                   </div>
                   <span
                     className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] ring-1 ${chipClass[a.status]}`}
@@ -167,7 +168,7 @@ function Index() {
       </section>
 
       <p className="mt-10 text-center text-[11px] text-muted-foreground">
-        Digital Agreement drafts for clarity, not legal advice. Review before you sign.
+        Digital Agreement Platform drafts for clarity, not legal advice. Review before you sign.
       </p>
     </StudioBackdrop>
   );

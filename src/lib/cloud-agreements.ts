@@ -5,6 +5,7 @@ import type { Agreement, AgreementStatus, Clause } from "@/lib/agreements";
 
 type AgreementRow = {
   id: string;
+  agreement_code: string;
   owner_id: string;
   type: string;
   title: string;
@@ -20,6 +21,12 @@ type AgreementRow = {
   sealed_at: string | null;
   created_at: string;
   updated_at: string;
+};
+
+type SignatureRow = {
+  party: "A" | "B";
+  signer_name: string;
+  signed_at: string;
 };
 
 export async function requireUser(): Promise<User> {
@@ -56,6 +63,7 @@ export async function agreementHash(input: {
 function rowToAgreement(row: AgreementRow): Agreement {
   return {
     id: row.id,
+    agreementCode: row.agreement_code,
     ownerId: row.owner_id,
     type: row.type,
     title: row.title,
@@ -85,7 +93,20 @@ export async function getCloudAgreement(id: string): Promise<Agreement | undefin
   await requireUser();
   const { data, error } = await supabase.from("agreements").select("*").eq("id", id).maybeSingle();
   if (error) throw error;
-  return data ? rowToAgreement(data as AgreementRow) : undefined;
+  if (!data) return undefined;
+  const agreement = rowToAgreement(data as AgreementRow);
+  const { data: signatures, error: signatureError } = await supabase
+    .from("signatures")
+    .select("party, signer_name, signed_at")
+    .eq("agreement_id", id)
+    .order("signed_at", { ascending: true });
+  if (signatureError) throw signatureError;
+  for (const signature of (signatures ?? []) as SignatureRow[]) {
+    const stamp = { name: signature.signer_name, at: signature.signed_at };
+    if (signature.party === "A") agreement.signatureA = stamp;
+    else agreement.signatureB = stamp;
+  }
+  return agreement;
 }
 
 export async function createCloudAgreement(agreement: Omit<Agreement, "id" | "createdAt" | "updatedAt">): Promise<string> {
@@ -107,6 +128,17 @@ export async function createCloudAgreement(agreement: Omit<Agreement, "id" | "cr
   if (error) throw error;
   await supabase.from("security_events").insert({ agreement_id: data.id, actor_id: user.id, event_type: "created" });
   return data.id;
+}
+
+export async function recordShareEvent(agreementId: string, channel: string): Promise<void> {
+  const user = await requireUser();
+  const { error } = await supabase.from("security_events").insert({
+    agreement_id: agreementId,
+    actor_id: user.id,
+    event_type: "shared",
+    details: { channel },
+  });
+  if (error) throw error;
 }
 
 export async function signCloudAgreement(agreement: Agreement, party: "A" | "B", signerName: string): Promise<void> {

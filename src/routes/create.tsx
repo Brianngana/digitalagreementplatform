@@ -1,13 +1,16 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { StudioBackdrop, AppHeader } from "@/components/StudioBackdrop";
 import {
   AGREEMENT_TYPES,
-  newId,
-  upsertAgreement,
-  type Agreement,
+  getPartyNames,
   type AgreementType,
 } from "@/lib/agreements";
+import { createCloudAgreement } from "@/lib/cloud-agreements";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 export const Route = createFileRoute("/create")({
   head: () => ({
@@ -35,6 +38,16 @@ function CreatePage() {
   const [type, setType] = useState<AgreementType | null>(null);
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [partyAEmail, setPartyAEmail] = useState("");
+  const [partyBEmail, setPartyBEmail] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    void supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) void navigate({ to: "/auth" });
+    });
+  }, [navigate]);
 
   if (!type) {
     return (
@@ -50,18 +63,19 @@ function CreatePage() {
 
         <div className="animate-rise mt-6 grid grid-cols-2 gap-2.5" style={{ animationDelay: "80ms" }}>
           {AGREEMENT_TYPES.map((t) => (
-            <button
+            <Button
               key={t.id}
               onClick={() => {
                 setType(t);
                 setStep(0);
                 setAnswers({});
               }}
-              className="glass-panel rounded-xl p-3.5 text-left transition-transform active:scale-[0.98]"
+              variant="ghost"
+              className="glass-panel h-auto min-h-24 justify-start rounded-lg p-3.5 text-left transition-transform active:scale-[0.98]"
             >
               <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cool">{t.tag}</span>
               <p className="mt-1 font-display text-lg uppercase tracking-wide">{t.label}</p>
-            </button>
+            </Button>
           ))}
         </div>
       </StudioBackdrop>
@@ -69,29 +83,42 @@ function CreatePage() {
   }
 
   const questions = type.questions;
-  const q = questions[step]!;
   const total = questions.length;
-  const value = answers[q.key] ?? "";
-  const setValue = (v: string) => setAnswers((prev) => ({ ...prev, [q.key]: v }));
+  const isContactStep = step === total;
+  const q = questions[step];
+  const value = q ? answers[q.key] ?? "" : "";
+  const setValue = (v: string) => {
+    if (!q) return;
+    setAnswers((prev) => ({ ...prev, [q.key]: v }));
+  };
 
-  const finish = () => {
+  const finish = async () => {
+    if (!type || !partyAEmail.trim() || !partyBEmail.trim()) {
+      setError("Enter a valid email address for both parties.");
+      return;
+    }
+    setSaving(true);
+    setError("");
     const built = type.build(answers);
-    const names = Object.values(answers).filter((v) => v && !/^\d/.test(v));
-    const now = new Date().toISOString();
-    const agreement: Agreement = {
-      id: newId(),
-      type: type.label,
-      title: built.title,
-      partyA: names[0] ?? "Party A",
-      partyB: names[1] ?? "Party B",
-      answers,
-      clauses: built.clauses,
-      status: "draft",
-      createdAt: now,
-      updatedAt: now,
-    };
-    upsertAgreement(agreement);
-    navigate({ to: "/agreement/$id", params: { id: agreement.id } });
+    const [partyA, partyB] = getPartyNames(type.id, answers);
+    try {
+      const id = await createCloudAgreement({
+        agreementCode: "",
+        type: type.label,
+        title: built.title,
+        partyA,
+        partyAEmail: partyAEmail.trim(),
+        partyB,
+        partyBEmail: partyBEmail.trim(),
+        answers,
+        clauses: built.clauses,
+        status: "draft",
+      });
+      await navigate({ to: "/agreement/$id", params: { id } });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "We could not save this agreement.");
+      setSaving(false);
+    }
   };
 
   return (
@@ -99,21 +126,23 @@ function CreatePage() {
       <AppHeader />
 
       <section className="animate-rise mt-8">
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => (step === 0 ? setType(null) : setStep(step - 1))}
           className="text-[12px] font-medium text-muted-foreground"
         >
           ← Back
-        </button>
+        </Button>
 
         <div className="glass-panel mt-4 overflow-hidden rounded-3xl">
           <div className="flex items-start justify-between px-5 pt-5">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                {type.label} · Question {step + 1} of {total}
+                {type.label} · Step {step + 1} of {total + 1}
               </p>
-              <h2 className="mt-1 font-display text-2xl uppercase leading-tight">{q.label}</h2>
-              {q.hint ? <p className="mt-1 text-[12px] text-muted-foreground">{q.hint}</p> : null}
+              <h2 className="mt-1 font-display text-2xl uppercase leading-tight">{isContactStep ? "Who can sign this agreement?" : q?.label}</h2>
+              {isContactStep ? <p className="mt-1 text-[12px] text-muted-foreground">Only these verified email addresses can sign.</p> : q?.hint ? <p className="mt-1 text-[12px] text-muted-foreground">{q.hint}</p> : null}
             </div>
             <span className="grid size-9 shrink-0 place-items-center rounded-full bg-seal/15 font-display text-sm text-seal ring-1 ring-seal/25">
               {step + 1}
@@ -121,7 +150,7 @@ function CreatePage() {
           </div>
 
           <div className="flex gap-1.5 px-5 pt-4">
-            {questions.map((_, i) => (
+            {Array.from({ length: total + 1 }).map((_, i) => (
               <span
                 key={i}
                 className={`h-1.5 flex-1 rounded-full ${i <= step ? "bg-seal" : "bg-foreground/10"}`}
@@ -130,42 +159,48 @@ function CreatePage() {
           </div>
 
           <div className="px-5 pt-5">
-            {q.type === "select" ? (
+            {isContactStep ? (
+              <div className="grid gap-4">
+                <label className="grid gap-2 text-sm font-medium">{getPartyNames(type.id, answers)[0]}'s email<Input type="email" value={partyAEmail} onChange={(e) => setPartyAEmail(e.target.value)} required autoComplete="email" /></label>
+                <label className="grid gap-2 text-sm font-medium">{getPartyNames(type.id, answers)[1]}'s email<Input type="email" value={partyBEmail} onChange={(e) => setPartyBEmail(e.target.value)} required autoComplete="email" /></label>
+              </div>
+            ) : q?.type === "select" ? (
               <div className="grid gap-2">
-                {q.options!.map((opt) => (
-                  <button
+                {(q.options ?? []).map((opt) => (
+                  <Button
                     key={opt}
                     onClick={() => setValue(opt)}
-                    className={`rounded-xl px-4 py-3 text-left text-sm font-semibold transition-colors ${
+                    variant="outline"
+                    className={`h-auto justify-start rounded-lg px-4 py-3 text-left text-sm font-semibold transition-colors ${
                       value === opt
                         ? "bg-foreground text-background"
                         : "border border-foreground/15 bg-foreground/5 text-foreground"
                     }`}
                   >
                     {opt}
-                  </button>
+                  </Button>
                 ))}
               </div>
-            ) : q.type === "textarea" ? (
-              <textarea
+            ) : q?.type === "textarea" ? (
+              <Textarea
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
                 placeholder={q.placeholder}
                 rows={4}
-                className="w-full rounded-xl border border-foreground/15 bg-foreground/5 px-4 py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-cool"
+                className="min-h-28"
               />
             ) : (
               <div className="flex items-center gap-2 rounded-xl border border-foreground/15 bg-foreground/5 px-4 py-3 focus-within:ring-2 focus-within:ring-cool">
-                {q.type === "number" ? (
+                  {q?.type === "number" ? (
                   <span className="font-display text-sm text-muted-foreground">KSh</span>
                 ) : null}
-                <input
-                  type={q.type === "number" ? "text" : q.type}
-                  inputMode={q.type === "number" ? "numeric" : undefined}
+                <Input
+                  type={q?.type === "number" ? "text" : q?.type}
+                  inputMode={q?.type === "number" ? "numeric" : undefined}
                   value={value}
                   onChange={(e) => setValue(e.target.value)}
-                  placeholder={q.placeholder}
-                  className="w-full bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground"
+                  placeholder={q?.placeholder}
+                  className="h-auto border-0 bg-transparent p-0 text-base shadow-none focus-visible:ring-0"
                 />
               </div>
             )}
@@ -173,20 +208,27 @@ function CreatePage() {
 
           <div className="flex gap-3 p-5">
             {step > 0 ? (
-              <button
+              <Button
+                variant="outline"
                 onClick={() => setStep(step - 1)}
                 className="rounded-xl border border-foreground/15 px-5 py-3.5 text-sm font-semibold"
               >
                 Back
-              </button>
+              </Button>
             ) : null}
-            <button
-              onClick={() => (step + 1 < total ? setStep(step + 1) : finish())}
-              className="flex-1 rounded-xl bg-seal py-3.5 text-sm font-semibold text-seal-foreground transition-transform active:scale-[0.99]"
+            <Button
+              onClick={() => {
+                if (!isContactStep && !value.trim()) { setError("Please answer this question before continuing."); return; }
+                setError("");
+                if (step < total) setStep(step + 1); else void finish();
+              }}
+              disabled={saving}
+              className="h-12 flex-1 bg-seal text-seal-foreground transition-transform active:scale-[0.99]"
             >
-              {step + 1 < total ? "Continue →" : "Generate agreement"}
-            </button>
+              {saving ? "Securing agreement…" : step < total ? "Continue →" : "Create secure agreement"}
+            </Button>
           </div>
+          {error ? <p role="alert" className="px-5 pb-5 text-sm text-destructive">{error}</p> : null}
         </div>
 
         <p className="mt-4 text-center text-[11px] text-muted-foreground">

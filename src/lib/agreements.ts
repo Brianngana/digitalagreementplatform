@@ -19,6 +19,7 @@ export interface Clause {
 
 export interface Agreement {
   id: string;
+  agreementCode: string;
   ownerId?: string;
   type: string;
   title: string;
@@ -44,6 +45,24 @@ export interface AgreementType {
   tag: string;
   questions: Question[];
   build: (a: Record<string, string>) => { title: string; clauses: Clause[] };
+}
+
+const PARTY_KEYS: Record<string, [string, string]> = {
+  loan: ["lender", "borrower"],
+  partnership: ["partnerA", "partnerB"],
+  employment: ["employer", "employee"],
+  rental: ["landlord", "tenant"],
+  sale: ["seller", "buyer"],
+  service: ["provider", "client"],
+  freelance: ["freelancer", "client"],
+  investment: ["investor", "recipient"],
+  nda: ["discloser", "receiver"],
+  custom: ["partyA", "partyB"],
+};
+
+export function getPartyNames(typeId: string, answers: Record<string, string>): [string, string] {
+  const keys = PARTY_KEYS[typeId] ?? ["partyA", "partyB"];
+  return [or(answers[keys[0]], "Party A"), or(answers[keys[1]], "Party B")];
 }
 
 const money = (v: string | undefined) => (v?.trim() ? `KSh ${v.trim()}` : "the agreed amount");
@@ -389,10 +408,6 @@ export function upsertAgreement(agreement: Agreement) {
 
 export function deleteAgreement(id: string) {
   saveAgreements(loadAgreements().filter((a) => a["id"] !== id));
-}
-
-export function newId(): string {
-  return `agr_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
 export function shareUrl(id: string): string {
