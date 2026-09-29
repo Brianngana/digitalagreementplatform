@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       agreements: {
         Row: {
+          agreement_code: string
           answers: Json
           clauses: Json
           content_hash: string
@@ -34,6 +35,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          agreement_code?: string
           answers?: Json
           clauses?: Json
           content_hash: string
@@ -52,6 +54,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          agreement_code?: string
           answers?: Json
           clauses?: Json
           content_hash?: string
