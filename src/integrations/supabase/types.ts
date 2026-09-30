@@ -23,9 +23,9 @@ export type Database = {
           created_at: string
           id: string
           owner_id: string
-          party_a_email: string | null
+          party_a_email: string
           party_a_name: string
-          party_b_email: string | null
+          party_b_email: string
           party_b_name: string
           revision: number
           sealed_at: string | null
@@ -42,9 +42,9 @@ export type Database = {
           created_at?: string
           id?: string
           owner_id: string
-          party_a_email?: string | null
+          party_a_email: string
           party_a_name: string
-          party_b_email?: string | null
+          party_b_email: string
           party_b_name: string
           revision?: number
           sealed_at?: string | null
@@ -61,9 +61,9 @@ export type Database = {
           created_at?: string
           id?: string
           owner_id?: string
-          party_a_email?: string | null
+          party_a_email?: string
           party_a_name?: string
-          party_b_email?: string | null
+          party_b_email?: string
           party_b_name?: string
           revision?: number
           sealed_at?: string | null
