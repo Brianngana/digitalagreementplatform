@@ -57,7 +57,7 @@ function CreatePage() {
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cool">Step 1 of 3</p>
           <h1 className="mt-2 font-display text-4xl uppercase leading-[0.95]">What kind of agreement?</h1>
           <p className="mt-2 max-w-[340px] text-sm text-muted-foreground">
-            Pick a starting point. You can change every detail afterwards.
+            Pick a starting point, then answer each required question in plain language.
           </p>
         </section>
 
@@ -232,7 +232,7 @@ function CreatePage() {
         </div>
 
         <p className="mt-4 text-center text-[11px] text-muted-foreground">
-          You can skip a question and fill it in later.
+          Your answers are secured to your account when the agreement is created.
         </p>
       </section>
     </StudioBackdrop>
