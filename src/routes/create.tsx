@@ -45,7 +45,7 @@ function CreatePage() {
 
   useEffect(() => {
     void supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) void navigate({ to: "/auth" });
+      if (!data.user) void navigate({ to: "/auth", search: { redirect: "/create" } });
     });
   }, [navigate]);
 
