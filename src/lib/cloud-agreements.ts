@@ -111,15 +111,19 @@ export async function getCloudAgreement(id: string): Promise<Agreement | undefin
 
 export async function createCloudAgreement(agreement: Omit<Agreement, "id" | "createdAt" | "updatedAt">): Promise<string> {
   const user = await requireUser();
+  const partyAEmail = agreement.partyAEmail?.trim().toLowerCase() || user.email?.toLowerCase();
+  const partyBEmail = agreement.partyBEmail?.trim().toLowerCase();
+  if (!partyAEmail || !partyBEmail) throw new Error("Both parties need a verified email address.");
+  if (partyAEmail === partyBEmail) throw new Error("Each party needs a different verified email address.");
   const contentHash = await agreementHash(agreement);
   const { data, error } = await supabase.from("agreements").insert({
     owner_id: user.id,
     type: agreement.type,
     title: agreement.title,
     party_a_name: agreement.partyA,
-    party_a_email: agreement.partyAEmail?.trim().toLowerCase() || user.email || null,
+    party_a_email: partyAEmail,
     party_b_name: agreement.partyB,
-    party_b_email: agreement.partyBEmail?.trim().toLowerCase() || null,
+    party_b_email: partyBEmail,
     answers: agreement.answers,
     clauses: agreement.clauses as unknown as Json,
     status: "draft",
