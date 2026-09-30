@@ -15,13 +15,13 @@ import { Textarea } from "@/components/ui/textarea";
 export const Route = createFileRoute("/create")({
   head: () => ({
     meta: [
-      { title: "Create an agreement — Digital Agreement" },
+      { title: "Create an agreement — Digital Agreement Platform" },
       {
         name: "description",
         content:
           "Pick an agreement type and answer a few plain questions. We draft the agreement for you.",
       },
-      { property: "og:title", content: "Create an agreement — Digital Agreement" },
+      { property: "og:title", content: "Create an agreement — Digital Agreement Platform" },
       {
         property: "og:description",
         content: "Pick a type, answer simple questions, and get a clear agreement.",

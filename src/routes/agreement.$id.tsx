@@ -98,7 +98,7 @@ function AgreementPage() {
 
   const share = async () => {
     const url = window.location.href;
-    const text = `${a.title} — our agreement on Digital Agreement`;
+    const text = `${a.title} — our agreement on Digital Agreement Platform`;
     if (navigator.share) {
       try {
         await navigator.share({ title: a.title, text, url });

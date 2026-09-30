@@ -376,40 +376,6 @@ export const STATUS_LABEL: Record<AgreementStatus, string> = {
   completed: "Completed",
 };
 
-// ---------- persistence (localStorage) ----------
-
-const KEY = "digital-agreement.v1";
-
-export function loadAgreements(): Agreement[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Agreement[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function saveAgreements(list: Agreement[]) {
-  window.localStorage.setItem(KEY, JSON.stringify(list));
-}
-
-export function getAgreement(id: string): Agreement | undefined {
-  return loadAgreements().find((a) => a["id"] === id);
-}
-
-export function upsertAgreement(agreement: Agreement) {
-  const list = loadAgreements();
-  const i = list.findIndex((a) => a["id"] === agreement.id);
-  if (i >= 0) list[i] = agreement;
-  else list.unshift(agreement);
-  saveAgreements(list);
-}
-
-export function deleteAgreement(id: string) {
-  saveAgreements(loadAgreements().filter((a) => a["id"] !== id));
-}
-
 export function shareUrl(id: string): string {
   return `${window.location.origin}/agreement/${id}`;
 }
