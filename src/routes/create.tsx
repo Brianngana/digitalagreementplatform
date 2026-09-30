@@ -11,6 +11,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { z } from "zod";
+
+const emailSchema = z.string().trim().email();
 
 export const Route = createFileRoute("/create")({
   head: () => ({
@@ -93,8 +96,14 @@ function CreatePage() {
   };
 
   const finish = async () => {
-    if (!type || !partyAEmail.trim() || !partyBEmail.trim()) {
+    const emailA = partyAEmail.trim().toLowerCase();
+    const emailB = partyBEmail.trim().toLowerCase();
+    if (!type || !emailSchema.safeParse(emailA).success || !emailSchema.safeParse(emailB).success) {
       setError("Enter a valid email address for both parties.");
+      return;
+    }
+    if (emailA === emailB) {
+      setError("Each party needs a different verified email address.");
       return;
     }
     setSaving(true);
@@ -107,9 +116,9 @@ function CreatePage() {
         type: type.label,
         title: built.title,
         partyA,
-        partyAEmail: partyAEmail.trim(),
+        partyAEmail: emailA,
         partyB,
-        partyBEmail: partyBEmail.trim(),
+        partyBEmail: emailB,
         answers,
         clauses: built.clauses,
         status: "draft",
