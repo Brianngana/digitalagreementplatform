@@ -10,3 +10,4 @@
 <!-- LOVABLE:END -->
 
 - Store profiles, agreements, signatures, and audit events in Lovable Cloud with account-scoped row policies; local browser storage is not a source of truth because agreements must remain private, shareable, and tamper-evident.
+- Generate permanent `DAP-XXXXXXXXXX` agreement codes in Lovable Cloud and enforce uniqueness there so references cannot collide or be changed by the browser.

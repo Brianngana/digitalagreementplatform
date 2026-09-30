@@ -117,7 +117,7 @@ export async function createCloudAgreement(agreement: Omit<Agreement, "id" | "cr
     type: agreement.type,
     title: agreement.title,
     party_a_name: agreement.partyA,
-    party_a_email: agreement.partyAEmail?.trim().toLowerCase() || user.email,
+    party_a_email: agreement.partyAEmail?.trim().toLowerCase() || user.email || null,
     party_b_name: agreement.partyB,
     party_b_email: agreement.partyBEmail?.trim().toLowerCase() || null,
     answers: agreement.answers,

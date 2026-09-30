@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { z } from "zod";
 import { ShieldCheck } from "lucide-react";
 import { StudioBackdrop, AppHeader } from "@/components/StudioBackdrop";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import { lovable } from "@/integrations/lovable";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/auth")({
+  validateSearch: z.object({ redirect: z.string().max(300).optional() }),
   head: () => ({ meta: [
     { title: "Secure sign in — Digital Agreement Platform" },
     { name: "description", content: "Sign in securely to create and manage private digital agreements." },
@@ -22,6 +24,7 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
+  const { redirect } = Route.useSearch();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -32,12 +35,16 @@ function AuthPage() {
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true); setMessage("");
+    const cleanEmail = email.trim().toLowerCase();
+    if (!z.string().email().safeParse(cleanEmail).success) { setMessage("Enter a valid email address."); setBusy(false); return; }
+    if (mode === "signup" && name.trim().length < 2) { setMessage("Enter your full name."); setBusy(false); return; }
     if (mode === "signup") {
-      const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin, data: { display_name: name.trim() } } });
+      const { error } = await supabase.auth.signUp({ email: cleanEmail, password, options: { emailRedirectTo: window.location.origin, data: { display_name: name.trim() } } });
       setMessage(error?.message ?? "Check your email to confirm your account, then sign in.");
     } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) setMessage(error.message); else await navigate({ to: "/" });
+      const { error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
+      const destination = redirect?.startsWith("/") && !redirect.startsWith("//") ? redirect : "/";
+      if (error) setMessage(error.message); else await navigate({ to: destination });
     }
     setBusy(false);
   }

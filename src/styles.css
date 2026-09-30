@@ -77,7 +77,15 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-body);
+    letter-spacing: 0;
   }
+}
+
+@media print {
+  body { background: var(--background); }
+  header, button, a[href^="https://wa.me"], a[href^="mailto:"], a[href^="sms:"] { display: none !important; }
+  .studio-bg { background: var(--background); }
+  .animate-glass-drift { display: none; }
 }
 
 /* Cinematic studio backdrop: cool light wash + drifting frosted glass panels */

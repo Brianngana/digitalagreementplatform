@@ -11,17 +11,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { z } from "zod";
+
+const emailSchema = z.string().trim().email();
 
 export const Route = createFileRoute("/create")({
   head: () => ({
     meta: [
-      { title: "Create an agreement — Digital Agreement" },
+      { title: "Create an agreement — Digital Agreement Platform" },
       {
         name: "description",
         content:
           "Pick an agreement type and answer a few plain questions. We draft the agreement for you.",
       },
-      { property: "og:title", content: "Create an agreement — Digital Agreement" },
+      { property: "og:title", content: "Create an agreement — Digital Agreement Platform" },
       {
         property: "og:description",
         content: "Pick a type, answer simple questions, and get a clear agreement.",
@@ -45,7 +48,7 @@ function CreatePage() {
 
   useEffect(() => {
     void supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) void navigate({ to: "/auth" });
+      if (!data.user) void navigate({ to: "/auth", search: { redirect: "/create" } });
     });
   }, [navigate]);
 
@@ -57,7 +60,7 @@ function CreatePage() {
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cool">Step 1 of 3</p>
           <h1 className="mt-2 font-display text-4xl uppercase leading-[0.95]">What kind of agreement?</h1>
           <p className="mt-2 max-w-[340px] text-sm text-muted-foreground">
-            Pick a starting point. You can change every detail afterwards.
+            Pick a starting point, then answer each required question in plain language.
           </p>
         </section>
 
@@ -93,8 +96,14 @@ function CreatePage() {
   };
 
   const finish = async () => {
-    if (!type || !partyAEmail.trim() || !partyBEmail.trim()) {
+    const emailA = partyAEmail.trim().toLowerCase();
+    const emailB = partyBEmail.trim().toLowerCase();
+    if (!type || !emailSchema.safeParse(emailA).success || !emailSchema.safeParse(emailB).success) {
       setError("Enter a valid email address for both parties.");
+      return;
+    }
+    if (emailA === emailB) {
+      setError("Each party needs a different verified email address.");
       return;
     }
     setSaving(true);
@@ -107,9 +116,9 @@ function CreatePage() {
         type: type.label,
         title: built.title,
         partyA,
-        partyAEmail: partyAEmail.trim(),
+        partyAEmail: emailA,
         partyB,
-        partyBEmail: partyBEmail.trim(),
+        partyBEmail: emailB,
         answers,
         clauses: built.clauses,
         status: "draft",
@@ -232,7 +241,7 @@ function CreatePage() {
         </div>
 
         <p className="mt-4 text-center text-[11px] text-muted-foreground">
-          You can skip a question and fill it in later.
+          Your answers are secured to your account when the agreement is created.
         </p>
       </section>
     </StudioBackdrop>

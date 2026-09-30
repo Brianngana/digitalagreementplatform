@@ -18,12 +18,14 @@ export function StudioBackdrop({ children }: { children: React.ReactNode }) {
 
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { LogOut, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 
 export function AppHeader() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [email, setEmail] = useState<string | null>(null);
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? null));
@@ -32,6 +34,8 @@ export function AppHeader() {
   }, []);
 
   async function signOut() {
+    await queryClient.cancelQueries();
+    queryClient.clear();
     await supabase.auth.signOut();
     await navigate({ to: "/auth", replace: true });
   }
@@ -43,7 +47,7 @@ export function AppHeader() {
         </span>
         <span className="truncate font-display text-base uppercase sm:text-xl">Digital Agreement Platform</span>
       </Link>
-      {email ? <Button type="button" size="icon" variant="ghost" onClick={signOut} title="Sign out" aria-label="Sign out"><LogOut /></Button> : <Button asChild size="sm" variant="outline"><Link to="/auth"><ShieldCheck />Sign in</Link></Button>}
+      {email ? <div className="flex items-center gap-1"><span className="hidden max-w-44 truncate text-xs text-muted-foreground sm:block">{email}</span><Button type="button" size="icon" variant="ghost" onClick={signOut} title="Sign out" aria-label="Sign out"><LogOut /></Button></div> : <Button asChild size="sm" variant="outline"><Link to="/auth"><ShieldCheck />Sign in</Link></Button>}
     </header>
   );
 }

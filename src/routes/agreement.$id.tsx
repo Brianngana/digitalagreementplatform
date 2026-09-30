@@ -1,24 +1,29 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { Check, Copy, Download, Mail, MessageCircle, ShieldCheck, Smartphone } from "lucide-react";
 import { StudioBackdrop, AppHeader } from "@/components/StudioBackdrop";
+import { STATUS_LABEL, type Agreement } from "@/lib/agreements";
+import { completeCloudAgreement, deleteCloudAgreement, getCloudAgreement, recordShareEvent, signCloudAgreement } from "@/lib/cloud-agreements";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
-  deleteAgreement,
-  getAgreement,
-  STATUS_LABEL,
-  upsertAgreement,
-  type Agreement,
-} from "@/lib/agreements";
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/agreement/$id")({
   head: () => ({
     meta: [
-      { title: "Your agreement — Digital Agreement" },
+      { title: "Secure agreement — Digital Agreement Platform" },
       {
         name: "description",
         content:
           "Review the agreement, read the plain-language explanation of each clause, share it, and sign electronically.",
       },
-      { property: "og:title", content: "Your agreement — Digital Agreement" },
+      { property: "og:title", content: "Secure agreement — Digital Agreement Platform" },
       {
         property: "og:description",
         content: "Review, understand, share, and sign your agreement.",
@@ -37,16 +42,21 @@ function AgreementPage() {
   const [signName, setSignName] = useState("");
   const [signing, setSigning] = useState<"A" | "B" | null>(null);
   const [copied, setCopied] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [currentUser, setCurrentUser] = useState<{ id: string; email: string } | null>(null);
 
   useEffect(() => {
-    setAgreement(getAgreement(id) ?? null);
+    void supabase.auth.getUser().then(async ({ data }) => {
+      const email = data.user?.email;
+      setCurrentUser(data.user && email ? { id: data.user.id, email: email.toLowerCase() } : null);
+      if (!data.user) { setAgreement(null); return; }
+      try { setAgreement((await getCloudAgreement(id)) ?? null); }
+      catch (cause) { setError(cause instanceof Error ? cause.message : "This agreement could not be loaded."); setAgreement(null); }
+    });
   }, [id]);
 
-  const update = (next: Agreement) => {
-    next.updatedAt = new Date().toISOString();
-    upsertAgreement(next);
-    setAgreement({ ...next });
-  };
+  const refresh = async () => setAgreement((await getCloudAgreement(id)) ?? null);
 
   if (agreement === undefined) {
     return (
@@ -64,12 +74,10 @@ function AgreementPage() {
         <div className="glass-panel mt-10 rounded-2xl p-6 text-center">
           <h1 className="font-display text-2xl uppercase">Agreement not found</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            This agreement isn't saved on this device. Agreements are stored privately in the browser
-            that created them.
+            {currentUser ? "This record was not found, or your verified email is not listed as a party." : "Sign in with the email address invited to this agreement."}
           </p>
-          <Link to="/" className="mt-4 inline-block rounded-xl bg-seal px-5 py-3 text-sm font-semibold text-seal-foreground">
-            Back home
-          </Link>
+          {error ? <p role="alert" className="mt-3 text-sm text-destructive">{error}</p> : null}
+          <div className="mt-5 flex justify-center gap-2"><Button asChild className="bg-seal text-seal-foreground"><Link to={currentUser ? "/" : "/auth"}>{currentUser ? "Back home" : "Sign in securely"}</Link></Button></div>
         </div>
       </StudioBackdrop>
     );
@@ -77,35 +85,31 @@ function AgreementPage() {
 
   const a = agreement;
 
-  const doSign = () => {
+  const doSign = async () => {
     if (!signName.trim() || !signing) return;
-    const stamp = { name: signName.trim(), at: new Date().toISOString() };
-    const next = { ...a };
-    if (signing === "A") next.signatureA = stamp;
-    else next.signatureB = stamp;
-    if (next.signatureA && next.signatureB) {
-      next.status = "signed";
-      next.sealedAt = new Date().toISOString();
-    } else {
-      next.status = "awaiting";
-    }
-    update(next);
-    setSignName("");
-    setSigning(null);
+    setBusy(true); setError("");
+    try {
+      await signCloudAgreement(a, signing, signName);
+      await refresh();
+      setSignName(""); setSigning(null);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "The signature could not be recorded."); }
+    setBusy(false);
   };
 
   const share = async () => {
     const url = window.location.href;
-    const text = `${a.title} — our agreement on Digital Agreement`;
+    const text = `${a.title} — our agreement on Digital Agreement Platform`;
     if (navigator.share) {
       try {
         await navigator.share({ title: a.title, text, url });
+        void recordShareEvent(a.id, "device");
         return;
       } catch {
         /* user cancelled */
       }
     }
     await navigator.clipboard.writeText(url);
+    void recordShareEvent(a.id, "link");
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -122,6 +126,9 @@ function AgreementPage() {
           {a.type} · {STATUS_LABEL[a.status]}
         </p>
         <h1 className="mt-1 font-display text-3xl uppercase leading-[0.95]">{a.title}</h1>
+        <div className="mt-3 inline-flex items-center gap-2 rounded-md border border-cool/25 bg-cool/10 px-3 py-2">
+          <ShieldCheck className="size-4 text-cool" /><span className="font-mono text-xs font-semibold tracking-wider text-cool">{a.agreementCode}</span>
+        </div>
         <p className="mt-2 text-sm text-muted-foreground">
           Between {a.partyA} and {a.partyB} · created{" "}
           {new Date(a.createdAt).toLocaleDateString()}
@@ -153,29 +160,30 @@ function AgreementPage() {
       <section className="animate-rise mt-6" style={{ animationDelay: "140ms" }}>
         <h2 className="font-display text-lg uppercase tracking-wide">Send to the other party</h2>
         <div className="mt-3 grid grid-cols-2 gap-2.5">
-          <button onClick={share} className="glass-panel rounded-xl py-3 text-sm font-semibold">
-            {copied ? "Link copied" : "Share link"}
-          </button>
-          <a
+          <Button variant="outline" onClick={share} className="glass-panel h-11"><Copy />{copied ? "Link copied" : "Copy link"}</Button>
+          <Button asChild variant="outline" className="glass-panel h-11"><a
             href={`https://wa.me/?text=${encodeURIComponent(`${a.title} — review and sign our agreement: ${typeof window !== "undefined" ? window.location.href : ""}`)}`}
             target="_blank"
             rel="noreferrer"
-            className="glass-panel grid place-items-center rounded-xl py-3 text-sm font-semibold"
+            aria-label="Share this agreement on WhatsApp"
+            onClick={() => void recordShareEvent(a.id, "whatsapp")}
           >
-            WhatsApp
-          </a>
-          <a
+            <MessageCircle />WhatsApp
+          </a></Button>
+          <Button asChild variant="outline" className="glass-panel h-11"><a
             href={`mailto:?subject=${encodeURIComponent(a.title)}&body=${encodeURIComponent(`Please review and sign our agreement: ${typeof window !== "undefined" ? window.location.href : ""}`)}`}
-            className="glass-panel grid place-items-center rounded-xl py-3 text-sm font-semibold"
+            aria-label="Share this agreement by email"
+            onClick={() => void recordShareEvent(a.id, "email")}
           >
-            Email
-          </a>
-          <a
+            <Mail />Email
+          </a></Button>
+          <Button asChild variant="outline" className="glass-panel h-11"><a
             href={`sms:?body=${encodeURIComponent(`Review and sign our agreement: ${typeof window !== "undefined" ? window.location.href : ""}`)}`}
-            className="glass-panel grid place-items-center rounded-xl py-3 text-sm font-semibold"
+            aria-label="Share this agreement by SMS"
+            onClick={() => void recordShareEvent(a.id, "sms")}
           >
-            SMS
-          </a>
+            <Smartphone />SMS
+          </a></Button>
         </div>
       </section>
 
@@ -202,37 +210,27 @@ function AgreementPage() {
                     </>
                   ) : signing === side ? (
                     <div className="mt-2 space-y-2">
-                      <input
+                      <Label htmlFor={`signature-${side}`}>Type your full legal name</Label>
+                      <Input
+                        id={`signature-${side}`}
                         autoFocus
                         value={signName}
                         onChange={(e) => setSignName(e.target.value)}
                         placeholder="Type your full name"
-                        className="w-full rounded-lg border border-foreground/15 bg-foreground/5 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-cool"
                       />
                       <div className="flex gap-2">
-                        <button
-                          onClick={doSign}
-                          className="flex-1 rounded-lg bg-seal py-2 text-sm font-semibold text-seal-foreground"
-                        >
-                          Sign
-                        </button>
-                        <button
+                        <Button onClick={() => void doSign()} disabled={busy} className="flex-1 bg-seal text-seal-foreground"><Check />{busy ? "Recording…" : "Sign securely"}</Button>
+                        <Button variant="outline"
                           onClick={() => setSigning(null)}
-                          className="rounded-lg border border-foreground/15 px-3 py-2 text-sm"
                         >
                           Cancel
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   ) : (
                     <>
                       <div className="mt-6 w-full border-b border-foreground/25" />
-                      <button
-                        onClick={() => setSigning(side)}
-                        className="mt-2 text-[12px] font-semibold text-cool"
-                      >
-                        Sign as {who} →
-                      </button>
+                      {currentUser?.email === (side === "A" ? a.partyAEmail : a.partyBEmail)?.toLowerCase() ? <Button variant="link" onClick={() => setSigning(side)} className="mt-1 px-0 text-cool">Sign as {who} →</Button> : <p className="mt-2 text-[11px] text-muted-foreground">Waiting for {who}'s verified email</p>}
                     </>
                   )}
                 </div>
@@ -250,7 +248,7 @@ function AgreementPage() {
               <div>
                 <p className="text-sm font-semibold">Both parties have signed</p>
                 <p className="text-[11px] text-muted-foreground">
-                  Sealed {new Date(a.sealedAt).toLocaleString()} · record ref {a.id}
+                  Sealed {new Date(a.sealedAt).toLocaleString()} · {a.agreementCode}
                 </p>
               </div>
             </div>
@@ -260,33 +258,21 @@ function AgreementPage() {
 
       {/* Manage */}
       <section className="animate-rise mt-6 flex flex-wrap gap-2.5" style={{ animationDelay: "260ms" }}>
-        {a.status === "signed" ? (
-          <button
-            onClick={() => update({ ...a, status: "completed" })}
-            className="rounded-xl bg-foreground px-5 py-3 text-sm font-semibold text-background"
-          >
-            Mark completed
-          </button>
+        {a.status === "signed" && currentUser?.id === a.ownerId ? (
+          <Button onClick={async () => { setBusy(true); setError(""); try { await completeCloudAgreement(a); await refresh(); } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not complete this agreement."); } setBusy(false); }} disabled={busy}>Mark completed</Button>
         ) : null}
-        <button
+        <Button variant="outline"
           onClick={() => window.print()}
-          className="glass-panel rounded-xl px-5 py-3 text-sm font-semibold"
+          className="glass-panel"
         >
-          Print / save PDF
-        </button>
-        <button
-          onClick={() => {
-            deleteAgreement(a.id);
-            navigate({ to: "/" });
-          }}
-          className="rounded-xl border border-destructive/40 px-5 py-3 text-sm font-semibold text-destructive"
-        >
-          Delete
-        </button>
+          <Download />Print / save PDF
+        </Button>
+        {a.status === "draft" && currentUser?.id === a.ownerId ? <AlertDialog><AlertDialogTrigger asChild><Button variant="destructive">Delete draft</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete this draft?</AlertDialogTitle><AlertDialogDescription>This permanently removes {a.agreementCode}. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep draft</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground" onClick={async () => { await deleteCloudAgreement(a); await navigate({ to: "/" }); }}>Delete permanently</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog> : null}
       </section>
+      {error ? <p role="alert" className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</p> : null}
 
       <p className="mt-10 text-center text-[11px] text-muted-foreground">
-        Digital Agreement drafts for clarity, not legal advice. Review before you sign.
+        Digital Agreement Platform drafts for clarity, not legal advice. Review before you sign.
       </p>
     </StudioBackdrop>
   );
